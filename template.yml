@@ -1,29 +1,29 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   Auto Scaling Lab:
-  VPC (2 public, 2 private), ALB in public subnets, ASG in private subnets,
-  Apache instances that display "Hello from [IP] / [Instance ID]" and a button that triggers CPU stress.
+  AWS CloudFormation template for the Auto Scaling Lab. It creates a
+  VPC, public and private subnets, an Application Load Balancer, and an Auto
+  Scaling Group with a scaling policy based on CPU utilization.
 Parameters:
-  VpcCidr:
+  VpcCiDR:
     Type: String
     Default: 10.0.0.0/16
-  PublicSubnet1Cidr:
+  PublicSubnet1CiDR:
     Type: String
     Default: 10.0.0.0/24
-  PublicSubnet2Cidr:
+  PublicSubnet2CiDR:
     Type: String
     Default: 10.0.1.0/24
-  PrivateSubnet1Cidr:
+  PrivateSubnet1CiDR:
     Type: String
     Default: 10.0.10.0/24
-  PrivateSubnet2Cidr:
+  PrivateSubnet2CiDR:
     Type: String
     Default: 10.0.11.0/24
   InstanceType:
     Type: String
     Default: t3.micro
     AllowedValues:
-      - t2.micro
       - t3.micro
       - t3.small
       - t3.medium
@@ -37,7 +37,7 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCidr
+      CidrBlock: !Ref VpcCiDR
       EnableDnsHostnames: true
       EnableDnsSupport: true
       Tags:
@@ -61,7 +61,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PublicSubnet1Cidr
+      CidrBlock: !Ref PublicSubnet1CiDR
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: true
       Tags:
@@ -72,7 +72,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PublicSubnet2Cidr
+      CidrBlock: !Ref PublicSubnet2CiDR
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       MapPublicIpOnLaunch: true
       Tags:
@@ -83,7 +83,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PrivateSubnet1Cidr
+      CidrBlock: !Ref PrivateSubnet1CiDR
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: false
       Tags:
@@ -94,7 +94,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PrivateSubnet2Cidr
+      CidrBlock: !Ref PrivateSubnet2CiDR
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       MapPublicIpOnLaunch: false
       Tags:
@@ -141,7 +141,7 @@ Resources:
       SubnetId: !Ref PublicSubnet1
       Tags:
         - Key: Name
-          Value: nat-gateway-1
+          Value: nat-gateway
 
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
@@ -149,7 +149,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: private-rt
+          Value: private-route-table
 
   PrivateRoute:
     Type: AWS::EC2::Route
@@ -171,10 +171,10 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable
 
   # Security Groups
-  AlbSecurityGroup:
+  ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP from anywhere to ALB
+      GroupDescription: Allows HTTP from the internet to ALB
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -242,7 +242,7 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBTargetGroup
 
-  # IAM Instance Profile (optional; here minimal)
+  # IAM Instance Profile
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -268,7 +268,7 @@ Resources:
         - !Ref InstanceRole
 
   # Launch Template for ASG
-  MyLaunchTemplate:
+  LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: asg-lab-launch-template
@@ -315,26 +315,100 @@ Resources:
             cat > /var/www/html/index.html << EOF
             <!doctype html>
             <html>
-            <head><title>ASG Lab</title></head>
+            <head>
+                <title>ASG Lab</title>
+                <style>
+                    /* General body styling for a clean look */
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                        background-color: #f4f7f9;
+                        color: #333;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        padding: 20px;
+                        box-sizing: border-box;
+                    }
+            
+                    /* Container to center and style the content box */
+                    .container {
+                        background-color: #fff;
+                        padding: 40px;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                        text-align: center;
+                        width: 100%;
+                        max-width: 600px;
+                    }
+            
+                    /* Style the main heading */
+                    h1 {
+                        color: #2c3e50;
+                        font-size: 2em;
+                        margin-bottom: 20px;
+                    }
+            
+                    /* Styling for the buttons */
+                    button {
+                        background-color: #3498db;
+                        color: #fff;
+                        border: none;
+                        padding: 12px 25px;
+                        margin: 10px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 1em;
+                        transition: background-color 0.3s ease, transform 0.1s ease;
+                    }
+            
+                    /* Hover effect for buttons */
+                    button:hover {
+                        background-color: #2980b9;
+                    }
+            
+                    /* Active/click effect for buttons */
+                    button:active {
+                        transform: scale(0.98);
+                    }
+            
+                    /* Styling for the result area */
+                    #result {
+                        margin-top: 25px;
+                        background-color: #ecf0f1;
+                        border: 1px solid #bdc3c7;
+                        border-radius: 5px;
+                        padding: 15px;
+                        white-space: pre-wrap;
+                        text-align: left;
+                        font-family: 'Courier New', Courier, monospace;
+                        overflow-x: auto;
+                    }
+                </style>
+            </head>
             <body>
-              <h1>Hello from $META_IP / $META_ID</h1>
-              <button id="stressBtn">Start CPU Stress</button>
-              <button id="stopBtn">Stop CPU Stress</button>
-              <div id="result"></div>
-              <script>
-                document.getElementById('stressBtn').addEventListener('click', function() {
-                  fetch('/cgi-bin/stress.sh')
-                    .then(r => r.text())
-                    .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
-                    .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
-                });
-                document.getElementById('stopBtn').addEventListener('click', function() {
-                  fetch('/cgi-bin/stop-stress.sh')
-                    .then(r => r.text())
-                    .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
-                    .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
-                });
-              </script>
+                <div class="container">
+                    <h1>Hello from $META_IP / $META_ID</h1>
+                    <button id="stressBtn">Start CPU Stress</button>
+                    <button id="stopBtn">Stop CPU Stress</button>
+                    <div id="result"></div>
+                </div>
+                <script>
+                    document.getElementById('stressBtn').addEventListener('click', function() {
+                        fetch('/cgi-bin/stress.sh')
+                            .then(r => r.text())
+                            .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
+                            .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
+                    });
+                    document.getElementById('stopBtn').addEventListener('click', function() {
+                        fetch('/cgi-bin/stop-stress.sh')
+                            .then(r => r.text())
+                            .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
+                            .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
+                    });
+                </script>
             </body>
             </html>
             EOF
@@ -355,7 +429,7 @@ Resources:
             systemctl start httpd
 
   # Auto Scaling Group
-  MyAutoScalingGroup:
+  AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: asg-lab
@@ -363,8 +437,8 @@ Resources:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
       LaunchTemplate:
-        LaunchTemplateId: !Ref MyLaunchTemplate
-        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
       MinSize: '1'
       MaxSize: '4'
       DesiredCapacity: '1'
@@ -379,7 +453,7 @@ Resources:
   CpuTargetTrackingPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
-      AutoScalingGroupName: !Ref MyAutoScalingGroup
+      AutoScalingGroupName: !Ref AutoScalingGroup
       PolicyType: TargetTrackingScaling
       TargetTrackingConfiguration:
         PredefinedMetricSpecification:
@@ -389,10 +463,7 @@ Resources:
 
 Outputs:
   LoadBalancerDNS:
-    Description: "Public URL of the Application Load Balancer"
+    Description: "Public url of the Application Load Balancer"
     Value: !GetAtt ALB.DNSName
     Export:
       Name: asg-lab-alb-dns
-  AutoScalingGroupName:
-    Description: "ASG Name"
-    Value: !Ref MyAutoScalingGroup
