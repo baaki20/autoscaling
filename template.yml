@@ -30,7 +30,7 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
   UISourceURL:
     Type: String
-    Default: "https://github.com/baaki20/autoscaling/blob/main/index.html"
+    Default: "https://github.com/baaki20/view/blob/main/index.html"
     Description: "URL to the enhanced UI HTML file"
 
 Resources:
