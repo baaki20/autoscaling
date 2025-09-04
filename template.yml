@@ -284,51 +284,63 @@ Resources:
             yum update -y
             yum install -y httpd
 
-            # Create CGI scripts
+            # create cgi-bin for CPU stress endpoints
             mkdir -p /var/www/cgi-bin
-            
-            # CPU stress script
+
+            # start stress script
             cat > /var/www/cgi-bin/stress.sh << 'EOF'
             #!/bin/bash
+            # Start two background CPU burners using yes
             nohup bash -c 'yes > /dev/null &' >/dev/null 2>&1
             nohup bash -c 'yes > /dev/null &' >/dev/null 2>&1
-            echo -e "Content-type: text/html\n\n<html><body><h2>CPU stress started</h2></body></html>"
+            echo -e "Content-type: text/html\n\n<html><body><h2>CPU stress started on this instance</h2></body></html>"
             EOF
             chmod +x /var/www/cgi-bin/stress.sh
 
-            # Stop stress script
+            # stop stress script
             cat > /var/www/cgi-bin/stop-stress.sh << 'EOF'
             #!/bin/bash
+            # Kill all yes processes
             sudo pkill -f "^yes"
-            echo -e "Content-type: text/html\n\n<html><body><h2>CPU stress stopped</h2></body></html>"
+            echo -e "Content-type: text/html\n\n<html><body><h2>CPU stress stopped on this instance</h2></body></html>"
             EOF
             chmod +x /var/www/cgi-bin/stop-stress.sh
 
-            # Get instance metadata
+            # build index page
             TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s)
             META_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/local-ipv4)
             META_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
 
-            # Download enhanced UI or use fallback
-            if curl -f -s "${UISourceURL}" -o /var/www/html/index.html; then
-                # Replace placeholders in downloaded HTML
-                sed -i "s/\$META_IP/$META_IP/g" /var/www/html/index.html
-                sed -i "s/\$META_ID/$META_ID/g" /var/www/html/index.html
-            else
-                # Fallback simple HTML
-                cat > /var/www/html/index.html << EOF
-            <!DOCTYPE html>
-            <html><head><title>ASG Lab</title></head>
-            <body style="font-family:Arial;text-align:center;padding:50px;">
-                <h1>Hello from $META_IP / $META_ID</h1>
-                <button onclick="fetch('/cgi-bin/stress.sh').then(r=>r.text()).then(t=>document.getElementById('result').innerHTML=t)">Start CPU Stress</button>
-                <button onclick="fetch('/cgi-bin/stop-stress.sh').then(r=>r.text()).then(t=>document.getElementById('result').innerHTML=t)">Stop CPU Stress</button>
-                <div id="result" style="margin-top:20px;"></div>
-            </body></html>
+            cat > /var/www/html/index.html << EOF
+            <!doctype html>
+            <html>
+            <head><title>ASG Lab</title></head>
+            <body>
+              <h1>Hello from $META_IP / $META_ID</h1>
+              <button id="stressBtn">Start CPU Stress</button>
+              <button id="stopBtn">Stop CPU Stress</button>
+              <div id="result"></div>
+              <script>
+                document.getElementById('stressBtn').addEventListener('click', function() {
+                  fetch('/cgi-bin/stress.sh')
+                    .then(r => r.text())
+                    .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
+                    .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
+                });
+                document.getElementById('stopBtn').addEventListener('click', function() {
+                  fetch('/cgi-bin/stop-stress.sh')
+                    .then(r => r.text())
+                    .then(t => { document.getElementById('result').innerHTML = '<pre>' + t + '</pre>'; })
+                    .catch(e => { document.getElementById('result').innerText = 'Error: ' + e; });
+                });
+              </script>
+            </body>
+            </html>
             EOF
-            fi
 
-            # Configure Apache CGI
+            # enable CGI handling in httpd
+            chown -R apache:apache /var/www/html /var/www/cgi-bin
+
             cat > /etc/httpd/conf.d/cgi.conf << 'EOF'
             ScriptAlias /cgi-bin/ "/var/www/cgi-bin/"
             <Directory "/var/www/cgi-bin">
@@ -338,10 +350,9 @@ Resources:
             </Directory>
             EOF
 
-            chown -R apache:apache /var/www/html /var/www/cgi-bin
             systemctl enable httpd
             systemctl start httpd
-
+            
   # Auto Scaling Group
   MyAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
