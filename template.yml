@@ -468,7 +468,7 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
-      MinSize: '1'
+      MinSize: '0'
       MaxSize: '4'
       DesiredCapacity: '1'
       TargetGroupARNs:
